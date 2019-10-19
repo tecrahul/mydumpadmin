@@ -15,7 +15,7 @@ source $CONFIGFILE
 TIME_FORMAT='%d%m%Y-%H%M'
 cTime=$(date +"${TIME_FORMAT}")
 LOGFILENAME=$LOG_PATH/mydumpadmin-${cTime}.txt
-CREDENTIALS="--defaults-extra-file=$CREDENTIAL_FILE"
+CREDENTIALS="--defaults-file=$CREDENTIAL_FILE"
 
 
 [ ! -d $LOG_PATH ] && ${MKDIR} -p ${LOG_PATH}
