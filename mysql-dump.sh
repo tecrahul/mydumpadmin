@@ -47,7 +47,7 @@ db_backup(){
                 mkdir -p ${LOCAL_BACKUP_DIR}/${CURRENT_DATE}
         for db in $DATABASES
         do
-                FILE_NAME="${db}.${CURRENT_DATE}-${CURRENT_TIME}.gz"
+                FILE_NAME="${db}.${CURRENT_DATE}-${CURRENT_TIME}.sql.gz"
                 FILE_PATH="${LOCAL_BACKUP_DIR}/${CURRENT_DATE}/"
                 FILENAMEPATH="$FILE_PATH$FILE_NAME"
                 [ $VERBOSE -eq 1 ] && echo -en "Database> $db... \n"
