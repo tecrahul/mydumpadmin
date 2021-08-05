@@ -51,7 +51,7 @@ db_backup(){
                 FILE_PATH="${LOCAL_BACKUP_DIR}/${CURRENT_DATE}/"
                 FILENAMEPATH="$FILE_PATH$FILE_NAME"
                 [ $VERBOSE -eq 1 ] && echo -en "Database> $db... \n"
-                ${MYSQLDUMP} ${CREDENTIALS} -h ${MYSQL_HOST} -P $MYSQL_PORT $db | ${GZIP} -9 > $FILENAMEPATH
+                ${MYSQLDUMP} ${CREDENTIALS} --single-transaction -h ${MYSQL_HOST} -P $MYSQL_PORT $db | ${GZIP} -9 > $FILENAMEPATH
                 echo "$db   :: `du -sh ${FILENAMEPATH}`"  >> ${LOGFILENAME}
                 [ $FTP_ENABLE -eq 1 ] && ftp_backup
                 [ $SFTP_ENABLE -eq 1 ] && sftp_backup
