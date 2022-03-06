@@ -38,6 +38,27 @@ You can also schedule this to run on daily basis using crontab. Add the followin
 > 0 2 * * * cd /etc/mydumpadmin && ./mysql-dump.sh
 
 
+### Backing up the Database to AWS S3 Bucket
+
+The code uses s3cmd tool available at https://github.com/s3tools/s3cmd
+
+To backup to AWS S3 bucket, you are required to install the s3cmd tool on your server, else the backup process will fail. Installation instruction for s3cmd tool is available at https://github.com/s3tools/s3cmd/blob/master/INSTALL.md
+
+After installation, you are required to update the **settigns.conf** file with the path to the installed s2cmd tool. You can achieve this by updating the **S3CMD** variable in **settings.conf**. The default path for installation of s3cmd on Ubuntu/Debian servers is **/usr/local/bin/s3cmd**
+
+It is also advised to run 
+
+> s3cmd --configure
+
+The above command sets the AWS access_key and secret_key so that it can be omitted from your code for security reasons. If you run the configure command, your s3 backup script from **mysql-dump.sh** can become
+
+> $S3CMD put "$FILE_NAME" s3://${S3_BUCKET_NAME}/${S3_UPLOAD_LOCATION}/
+
+instead of 
+
+> $S3CMD --access_key="$AWS_ACCESS_KEY" --secret_key="$AWS_SECRET_ACCESS_KEY" put "$FILE_NAME" s3://${S3_BUCKET_NAME}/${S3_UPLOAD_LOCATION}/
+
+
 ### Visit here
 https://tecadmin.net/bash-script-mysql-database-backup/
 
