@@ -20,7 +20,7 @@ DATE_FORMAT='%Y%m%d'
 CURRENT_DATE=$(date +"${DATE_FORMAT}")
 CURRENT_TIME=$(date +"%H%M")
 LOGFILENAME=$LOG_PATH/mydumpadmin-${CURRENT_DATE}-${CURRENT_TIME}.log
-CREDENTIALS="--defaults-file=$CREDENTIAL_FILE"
+CREDENTIALS="--defaults-extra-file=$CREDENTIAL_FILE"
 
 
 [ ! -d $LOG_PATH ] && ${MKDIR} -p ${LOG_PATH}
@@ -38,7 +38,7 @@ db_backup(){
 
 	### Start database backups
         if [ "$DB_NAMES" == "ALL" ]; then
-		DATABASES=`$MYSQL $CREDENTIALS -h $MYSQL_HOST -P $MYSQL_PORT -Bse 'show databases' | grep -Ev "^(Database|mysql|performance_schema|information_schema)"$`
+		DATABASES=`$MYSQL $CREDENTIALS -h $MYSQL_HOST -P $MYSQL_PORT -Bse 'show databases' | grep -Ev "^(Database|mysql|performance_schema|information_schema|sys)"$`
         else
 		DATABASES=$DB_NAMES
         fi
@@ -53,13 +53,14 @@ db_backup(){
                 FILE_PATH="${LOCAL_BACKUP_DIR}/${CURRENT_DATE}/"
                 FILENAMEPATH="$FILE_PATH$FILE_NAME"
                 [ $VERBOSE -eq 1 ] && echo -en "Database> $db... \n"
-                ${MYSQLDUMP} ${CREDENTIALS} --single-transaction -h ${MYSQL_HOST} -P $MYSQL_PORT $db | ${GZIP} -9 > $FILENAMEPATH
+                ${MYSQLDUMP} ${CREDENTIALS} ${MYDUMP_PARAM} -h ${MYSQL_HOST} -P $MYSQL_PORT $db | ${GZIP} -9 > $FILENAMEPATH
                 echo "$db   :: `du -sh ${FILENAMEPATH}`"  >> ${LOGFILENAME}
                 [ $FTP_ENABLE -eq 1 ] && ftp_backup
                 [ $SFTP_ENABLE -eq 1 ] && sftp_backup
                 [ $S3_ENABLE -eq 1 ] && s3_backup
         done
         [ $VERBOSE -eq 1 ] && echo "*** Backup completed ***"
+        [ $MEGA_ENABLE -eq 1 ] && mega_backup
         [ $VERBOSE -eq 1 ] && echo "*** Check backup files in ${FILE_PATH} ***"
 }
 
@@ -84,6 +85,9 @@ check_cmds(){
 	if [ $SFTP_ENABLE -eq 1 ]; then
 		[ ! -x $SCP ] && close_on_error "FILENAME $SCP does not exists. Make sure correct path is set in $CONFIGFILE."
 	fi
+	if [ $MEGA_ENABLE -eq 1 ]; then
+	       [ ! -x $MEGA ] && close_on_error "FILENAME $MEGA does not exists. Make sure correct path is set in $CONFIGFILE."
+	fi
 }
 
 ### Check if database connectin is working...
@@ -91,8 +95,6 @@ check_mysql_connection(){
         ${MYSQLADMIN} ${CREDENTIALS} -h ${MYSQL_HOST} -P ${MYSQL_PORT} ping | ${GREP} 'alive'>/dev/null
         [ $? -eq 0 ] || close_on_error "Error: Cannot connect to MySQL Server. Make sure username and password setup correctly in $CONFIGFILE"
 }
-
-
 
 ### Copy backup files to ftp server
 ftp_backup(){
@@ -124,28 +126,42 @@ s3_backup(){
 	$S3CMD --access_key="$AWS_ACCESS_KEY" --secret_key="$AWS_SECRET_ACCESS_KEY" --host="$S3_ENDPOINT" --host-bucket="${S3_BUCKET_NAME}.${S3_ENDPOINT}" put "$FILE_NAME" s3://${S3_BUCKET_NAME}/${S3_UPLOAD_LOCATION}/
 }
 
+### Copy backup files to Mega.nz cloud
+mega_backup(){
+	[ $VERBOSE -eq 1 ] && echo "Uploading backup file to Mega.nz"
+	cd ${FILE_PATH}
+        mega-login ${MEGA_USER} ${MEGA_PASS}
+        mega-put -c ${FILE_PATH} ${MEGA_PATH}
+        mega-logout
+}
+
+### Remove old backup file from Mega.nz cloud
+mega_remove(){
+	[ $VERBOSE -eq 1 ] && echo "Removing old backups from Mega.nz"
+        mega-login ${MEGA_USER} ${MEGA_PASS}
+        mega-rm -r -f ${MEGA_PATH}/${DBDELDATE}
+        mega-logout
+}
+
 ### Remove older backups
 clean_old_backups(){
-
 	[ $VERBOSE -eq 1 ] && echo "Removing old backups"
 	DBDELDATE=`date +"${DATE_FORMAT}" --date="${BACKUP_RETAIN_DAYS} days ago"`
 	if [ ! -z ${LOCAL_BACKUP_DIR} ]; then
-		  cd ${LOCAL_BACKUP_DIR}
-		  if [ ! -z ${DBDELDATE} ] && [ -d ${DBDELDATE} ]; then
-				rm -rf ${DBDELDATE}
-		  fi
+		cd ${LOCAL_BACKUP_DIR}
+		if [ ! -z ${DBDELDATE} ] && [ -d ${DBDELDATE} ]; then
+			rm -rf ${DBDELDATE}
+                        [ $MEGA_ENABLE -eq 1 ] && mega_remove
+		fi
 	fi
 }
 
 ### Send report email
 send_report(){
-	if [ $SENDEMAIL -eq 1 ]
-	then
-			cat ${LOGFILENAME} | mail -vs "Database dump report for `date +%D`" ${EMAILTO}
+	if [ $SENDEMAIL -eq 1 ]; then
+		cat ${LOGFILENAME} | mail -vs "Database dump report for `date +%D`" ${EMAILTO}
 	fi
 }
-
-
 
 ### main ####
 check_config
